@@ -2,24 +2,6 @@
 
 > **Edoll** adalah tools ringan dan cepat untuk mendeteksi subdomain aktif dari suatu domain menggunakan sumber dari [rapiddns.io](https://rapiddns.io). Dirancang khusus untuk hunter bug / tunneling inject.
 
-![Edoll Banner]╔═════════════════════════════════════════════════╗
-║                                                 ║
-║    ██████╗ ██╗   ██╗ ██████╗ ██╗     ██╗        ║
-║    ██╔══██╗╚██╗ ██╔╝██╔═══██╗██║     ██║        ║
-║    ██████╔╝ ╚████╔╝ ██║   ██║██║     ██║        ║
-║    ██╔═══╝   ╚██╔╝  ██║   ██║██║     ██║        ║
-║    ██║        ██║   ╚██████╔╝███████╗███████╗   ║
-║                                                 ║
-╚═════════════════════════════════════════════════╝
-
-     ⚡ E-V0.1 BUG FINDER by.edoll ⚡
-╔═══════════════ MENU ══════════════╗
-║ 1. Get SubDomain                  ║
-║ 2. Hasil                          ║
-║ 0. Keluar                         ║
-╚═══════════════════════════════════╝
-
-[?] Pilih opsi by number:
 ---
 
 ## ✨ Fitur Utama
@@ -33,5 +15,12 @@
 ## 🛠️ Instalasi
 
 ```bash
+pkg update && pkg upgrade -y
+pkg install git
+pkg install bash
 pkg install python -y
 pip install requests
+git clone https://github.com/InetByOu/esubfinder.git
+cd esubfinder
+bash install.sh
+jalankan dengan ketik edoll
