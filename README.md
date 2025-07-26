@@ -22,5 +22,6 @@ pkg install python -y
 pip install requests
 git clone https://github.com/InetByOu/esubfinder.git
 cd esubfinder
+chmod +x install.sh
 bash install.sh
 jalankan dengan ketik edoll
