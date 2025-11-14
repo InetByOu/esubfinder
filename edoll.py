@@ -36,7 +36,7 @@ def banner():
 ╚═════════════════════════════════════════════════╝\033[0m
 """
     print(art)
-    typewriter("\033[1;37m     ⚡ E-V0.1 BUG FINDER by.edoll ⚡\033[0m", delay=0.03)
+    typewriter("\033[1;37m     ⚡ E-V0.2 BUG FINDER by.edoll ⚡\033[0m", delay=0.03)
 
 def fetch_subdomains(domain):
     try:
