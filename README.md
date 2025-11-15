@@ -1,130 +1,45 @@
-# Edoll E‑V3.0
+# Edoll - Smart Subdomain Scanner & Inject Tester
+**Versi:** E‑V3.9  
+**Author:** Bang Edoll (2025)  
+**Platform:** Termux & Linux  
+**Lisensi:** MIT  
 
-**Advanced Subdomain Scanner & Tunnel Analyzer (Termux Edition)**\
-Versi terbaru Edoll menghadirkan pemindaian cepat, analisis tunnel
-otomatis, manajemen dependensi, riwayat domain, dan tampilan modern
-dengan animasi loading.
+---
 
-------------------------------------------------------------------------
+## 🔍 Apa Itu Edoll?
+**Edoll** adalah tool **intelligent subdomain scanner** dan **inject tester** yang:
 
-## 🎯 Fitur Utama
+- Mengambil subdomain dari RapidDNS
+- Scan HTTP/HTTPS + port 80/443
+- Deteksi server & Cloudflare
+- Simpan hasil scan ke history
+- Bisa test inject satu-per-satu atau semua otomatis
+- Menyimpan semua data ke folder tersembunyi
+- Memiliki updater otomatis dengan backup & restore
 
-### 🔍 1. **Subdomain Scanner**
+Dibuat untuk membantu proses **bug hunting**, **inject config**, **V2Ray testing**, dan **tunneling eksperimen**.
 
--   Pemindaian cepat multi-thread.
--   Deteksi: HTTP Status, Cloudflare, IP, Server, Redirect.
--   Extreme Scan (Deep mode + Header expand).
+---
 
-### 🔐 2. **Tunnel Analyzer**
+Semua bisa diubah lewat menu **Settings**.
 
--   Deteksi otomatis:
-    -   WS (WebSocket)
-    -   SNI/HTTPS 443
-    -   Enhanced Tunnel Ready
-    -   V2Ray readiness
+---
 
-### 📁 3. **History Manager**
+## 🚀 Instalasi (Termux / Linux)
+Jalankan:
 
--   Menyimpan domain yang pernah dipindai.
--   Dapat dipilih kembali sebagai opsi cepat.
--   Fitur hapus dan reset riwayat.
-
-### ⚙️ 4. **Dependensi Manager**
-
--   Auto-scan dependensi penting.
--   Menampilkan status (Installed / Missing).
--   Menawarkan instalasi otomatis bila diperlukan.
-
-### 📝 5. **Preview & Editor Mode**
-
--   Hasil scan bisa dibuka di text viewer internal.
--   Memudahkan copy--paste ke aplikasi lain.
-
-### 🎨 6. **UI Profesional**
-
--   Warna kategori: info, warning, success, danger.
--   Animasi loading modern tanpa simbol rumit.
--   Layout responsive friendly untuk Termux.
-
-------------------------------------------------------------------------
-
-## 📦 Dependensi
-
-Edoll membutuhkan dependensi berikut agar berfungsi penuh:
-
-  Dependensi    Fungsi         Status
-  ------------- -------------- ----------
-  `python3`     Core engine    Wajib
-  `requests`    HTTP Request   Wajib
-  `dnspython`   DNS Resolve    Wajib
-  `openssl`     SSL Checking   Wajib
-  `curl`        Backup fetch   Opsional
-  `nano`        Text editor    Opsional
-
-Semua dapat dipasang melalui menu **Dependensi Manager**.
-
-------------------------------------------------------------------------
-
-## 🚀 Cara Instalasi
-
-### 1. Unduh `edoll.py` dan `install.sh`
-
-Letakkan kedua file dalam satu folder.
-
-### 2. Jalankan installer
-
-``` bash
+```bash
+curl -sSL https://raw.githubusercontent.com/InetByOu/esubfinder/main/install.sh -o install.sh
 bash install.sh
 ```
+---
 
-### 3. Jalankan Edoll
-
-``` bash
-edoll
-```
-
-------------------------------------------------------------------------
-
-## 🧠 Cara Penggunaan
-
-### ▶ Mode Utama
-
--   **Auto Scan** → Pemindaian standar cepat.\
--   **Auto Cek Result** → Analisis hasil scan lama.\
--   **Extreme Scan + Cek** → Mode agresif & deep check.\
--   **Tunnel Mode** → Menampilkan domain siap WS/SNI.\
--   **History** → Daftar domain yang pernah dipindai.\
--   **Dependensi Manager** → Scan & install paket.\
--   **Settings** → Pengaturan global.
-
-------------------------------------------------------------------------
-
-## 🛠 Struktur File
-
-    /data/data/com.termux/files/usr/share/edoll/
-     ├─ edoll.py
-     ├─ history.json
-     ├─ results/
-     ├─ config.json
-     └─ assets/
-
-------------------------------------------------------------------------
-
-## ❤️ Kontribusi
-
-Anda dapat mengembangkan Edoll dengan: - Membuat modul scanner baru -
-Meningkatkan kecepatan threading - Menambah database bug host
-
-------------------------------------------------------------------------
-
-## 📜 Lisensi
-
-Edoll E‑V3.0 dirilis dengan lisensi **MIT License**.\
-Anda bebas memodifikasi & mendistribusikan selama menyertakan atribusi.
-
-------------------------------------------------------------------------
-
-## 🤝 Kredit
-
-Dikembangkan khusus untuk pengguna Termux\
-Dibangun dengan fokus: *stabil, cepat, dan tidak membosankan*.
+## ⭐ Fitur Utama
+- Scan subdomain cepat (multithread)
+- Inject tester (individual / bulk)
+- Auto history JSON
+- Auto restore jika update gagal
+- Ctrl+C aman (bisa menghentikan proses)
+- Dependen otomatis dicek sebelum install
+- UI terminal profesional (warna + animasi)
+- Semua data tersimpan rapi di:
