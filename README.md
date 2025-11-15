@@ -26,11 +26,10 @@ Semua bisa diubah lewat menu **Settings**.
 ---
 
 ## 🚀 Instalasi (Termux / Linux)
-Jalankan:
+Copy dan jalankan:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/InetByOu/esubfinder/main/install.sh -o install.sh
-bash install.sh
+curl -sSL https://raw.githubusercontent.com/InetByOu/esubfinder/main/install.sh -o install.sh && bash install.sh && edoll 
 ```
 ---
 
