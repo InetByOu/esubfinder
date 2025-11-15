@@ -41,5 +41,5 @@ bash install.sh
 - Auto restore jika update gagal
 - Ctrl+C aman (bisa menghentikan proses)
 - Dependen otomatis dicek sebelum install
-- UI terminal profesional (warna + animasi)
-- Semua data tersimpan rapi di:
+- UI terminal yang ramah(warna + animasi)
+- Semua data tersimpan rapi
