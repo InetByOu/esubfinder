@@ -1,42 +1,54 @@
 #!/bin/bash
+# ===============================================
+# Edoll Installer / Updater (Termux / Linux)
+# Versi: E-V3.9
+# ===============================================
 
-echo "=============================================="
-echo "        Installing E-DOLL Super Scanner"
-echo "=============================================="
+EDOLL_DIR="$HOME/.edoll"
+BIN_DIR="$PREFIX/bin"
+LAUNCHER="$BIN_DIR/edoll"
+REPO="https://github.com/InetByOu/esubfinder.git"
 
-PREFIX="/data/data/com.termux/files/usr"
-INSTALL_DIR="$PREFIX/share/edoll"
-BIN_FILE="$PREFIX/bin/edoll"
-SOURCE_FILE="edoll.py"
+echo ""
+echo "📦 Menginstal / Memperbarui Edoll..."
 
-# Cek apakah file script ada
-if [ ! -f "$SOURCE_FILE" ]; then
-    echo "[X] ERROR: File edoll.py tidak ditemukan!"
-    echo "     Pastikan file ini berada di folder yang sama dengan installer."
-    exit 1
+# Cek dependensi
+for d in git curl python; do
+    if ! command -v $d &>/dev/null; then
+        echo "🔧 Menginstal $d..."
+        pkg install -y $d || apt install -y $d
+    fi
+done
+
+# Backup jika sudah ada
+if [ -d "$EDOLL_DIR" ]; then
+    echo "♻️  Membuat backup versi lama..."
+    cp "$EDOLL_DIR/edoll.py" "$EDOLL_DIR/edoll.py.bak" 2>/dev/null || true
 fi
 
-echo "[*] Membuat direktori instalasi..."
-mkdir -p "$INSTALL_DIR"
+# Buat direktori tersembunyi
+mkdir -p "$EDOLL_DIR/history"
+mkdir -p "$EDOLL_DIR/logs"
 
-echo "[*] Membersihkan sisa instalasi lama..."
-rm -f "$BIN_FILE"
-rm -rf "$INSTALL_DIR"/*
+# Unduh file utama
+echo "⬇️  Mengunduh edoll.py terbaru..."
+curl -sSL https://raw.githubusercontent.com/InetByOu/esubfinder/main/edoll.py -o "$EDOLL_DIR/edoll.py" || {
+    echo "❌ Gagal download, restore versi lama..."
+    [ -f "$EDOLL_DIR/edoll.py.bak" ] && cp "$EDOLL_DIR/edoll.py.bak" "$EDOLL_DIR/edoll.py"
+    exit 1
+}
 
-echo "[*] Menyalin file script..."
-cp "$SOURCE_FILE" "$INSTALL_DIR/edoll.py"
-chmod +x "$INSTALL_DIR/edoll.py"
+chmod +x "$EDOLL_DIR/edoll.py"
 
-echo "[*] Membuat symlink ke /usr/bin..."
-ln -sf "$INSTALL_DIR/edoll.py" "$BIN_FILE"
-chmod +x "$BIN_FILE"
+# Buat launcher global
+echo "⚙️  Membuat launcher global..."
+cat <<EOF > "$LAUNCHER"
+#!/bin/bash
+python3 "$EDOLL_DIR/edoll.py" "\$@"
+EOF
 
-# Clean leftover temp files
-echo "[*] Membersihkan file sementara..."
-rm -f install.sh~
-rm -f .edoll_tmp 2>/dev/null
+chmod +x "$LAUNCHER"
 
-echo "=============================================="
-echo "[✔] Instalasi berhasil!"
-echo "[✔] Jalankan dengan perintah:  edoll"
-echo "=============================================="
+echo ""
+echo "🎉 Instalasi / Update selesai!"
+echo "Sekarang jalankan: edoll"
