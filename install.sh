@@ -88,12 +88,12 @@ curl -sSL https://raw.githubusercontent.com/InetByOu/esubfinder/main/edoll.py -o
 } & spinner $!
 echo " ✅"
 
-rm -rf "$INSTALL_DIR"
-rm -rf "$LAUNCHER"
 sleep 5
 # ============================
 # Buat launcher
 # ============================
+rm -rf "$INSTALL_DIR"
+rm -rf "$LAUNCHER"
 echo -n "⚙️ Membuat launcher..."
 {
 cat <<EOF > "$LAUNCHER"
