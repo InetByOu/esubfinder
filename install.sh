@@ -4,6 +4,8 @@ set -e
 INSTALL_DIR="$PREFIX/share/.edoll"
 LAUNCHER="$PREFIX/bin/edoll"
 PYTHON_BIN="python"
+rm -rf "$INSTALL_DIR"
+rm -rf "$LAUNCHER"
 
 mkdir -p "$INSTALL_DIR"
 
