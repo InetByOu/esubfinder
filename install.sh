@@ -1,4 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
+rm -rf $PYTHON_BIN $INSTALL_DIR/edoll.py
+sleep 5
 set -e
 
 INSTALL_DIR="$PREFIX/share/.edoll"
@@ -87,8 +89,7 @@ echo -n "⬇️ Mengunduh edoll.py..."
 curl -sSL https://raw.githubusercontent.com/InetByOu/esubfinder/main/edoll.py -o "$INSTALL_DIR/edoll.py"
 } & spinner $!
 echo " ✅"
-rm -rf $PYTHON_BIN $INSTALL_DIR/edoll.py
-sleep 10
+
 # ============================
 # Buat launcher
 # ============================
