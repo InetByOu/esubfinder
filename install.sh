@@ -1,5 +1,4 @@
 #!/data/data/com.termux/files/usr/bin/bash
-clear
 set -e
 
 INSTALL_DIR="$PREFIX/share/.edoll"
@@ -48,7 +47,7 @@ echo " ✅"
 # ============================
 echo -n "🌐 Mengecek koneksi internet..."
 {
-curl -I --max-time 5 http://example.com >/dev/null 2>&1
+curl -I --max-time 5 http://google.com >/dev/null 2>&1
 } & spinner $!
 echo " ✅"
 
