@@ -1,4 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
+clear
 set -e
 
 INSTALL_DIR="$PREFIX/share/.edoll"
