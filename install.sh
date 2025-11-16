@@ -7,8 +7,7 @@ PYTHON_BIN="python"
 
 mkdir -p "$INSTALL_DIR"
 
-echo "📦 Memulai instalasi / update Edoll..."
-sleep 1
+echo "📦 Instalasi Edoll dimulai..."
 
 
 # ============================
@@ -16,105 +15,56 @@ sleep 1
 # ============================
 if command -v python3 >/dev/null 2>&1; then
     PYTHON_BIN="python3"
-elif command -v python >/dev/null 2>&1; then
-    PYTHON_BIN="python"
-else
-    echo "❌ Python tidak ditemukan!"
+elif ! command -v python >/dev/null 2>&1; then
     echo "🔧 Menginstal Python..."
-    pkg install -y python
-    PYTHON_BIN="python"
+    pkg install -y python >/dev/null 2>&1
 fi
 
 
 # ============================
 # Cek koneksi internet
 # ============================
-echo "🔍 Mengecek koneksi internet..."
-curl -I --max-time 5 http://example.com >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-    echo "❌ Tidak bisa mengakses internet."
-    echo "💡 Tips: Pastikan Termux versi F-Droid atau gunakan VPN."
-    exit 1
-fi
-echo "✅ Internet OK!"
-sleep 1
-
-
-# ============================
-# Update SSL & Repository
-# ============================
-echo "🔒 Memperbarui certificates..."
-pkg install -y openssl ca-certificates >/dev/null 2>&1 || true
-
-echo "🔄 Memperbarui repository..."
-pkg update -y >/dev/null 2>&1 || true
-
-
-# ============================
-# Install Termux dependencies
-# ============================
-echo "🔧 Mengecek dependensi..."
-
-install_pkg() {
-    local pkgname="$1"
-    echo "🔧 Instal $pkgname..."
-    pkg install -y "$pkgname" >/dev/null 2>&1 || \
-        echo "⚠️ Gagal instal $pkgname! Coba aktifkan VPN"
-}
-
-command -v git >/dev/null 2>&1 || install_pkg git
-command -v curl >/dev/null 2>&1 || install_pkg curl
-command -v wget >/dev/null 2>&1 || install_pkg wget
-
-
-# ============================
-# Python Pip Fix
-# ============================
-echo "📦 Memperbaiki pip..."
-$PYTHON_BIN -m ensurepip --upgrade >/dev/null 2>&1 || true
-$PYTHON_BIN -m pip install --upgrade pip >/dev/null 2>&1 || true
-
-
-# ============================
-# Install Python Modules
-# ============================
-echo "📦 Install modul Python Edoll..."
-$PYTHON_BIN -m pip install --upgrade \
-    aiohttp \
-    requests \
-    rich \
-    beautifulsoup4 \
-    --no-cache-dir >/dev/null 2>&1 || {
-
-    echo "⚠️ Gagal install modul Python."
-    echo "🔄 Mencoba mirror pip lain..."
-    $PYTHON_BIN -m pip install --upgrade \
-        aiohttp \
-        requests \
-        rich \
-        beautifulsoup4 \
-        -i https://pypi.org/simple
-}
-
-
-# ============================
-# Download Latest EDOLL
-# ============================
-echo "⬇️ Mengunduh edoll.py terbaru..."
-if ! curl -sSLk \
-  https://raw.githubusercontent.com/InetByOu/esubfinder/main/edoll.py \
-  -o "$INSTALL_DIR/edoll.py"; then
-
-    echo "❌ Gagal download edoll.py"
-    echo "💡 Coba mode VPN!"
+echo "🔍 Mengecek internet..."
+if ! curl -I --max-time 5 http://example.com >/dev/null 2>&1; then
+    echo "❌ Tidak ada internet!"
     exit 1
 fi
 
 
 # ============================
-# Buat Global Launcher
+# Cek dependensi minimal
 # ============================
-echo "⚙️ Membuat launcher global..."
+echo "🔧 Cek dependensi..."
+
+command -v curl >/dev/null 2>&1 || pkg install -y curl >/dev/null 2>&1
+command -v openssl >/dev/null 2>&1 || pkg install -y openssl >/dev/null 2>&1
+
+
+# ============================
+# Install Modul Python (cepat)
+# ============================
+echo "📦 Instal modul Python..."
+
+$PYTHON_BIN - <<EOF
+import pkgutil, subprocess, sys
+deps = ["aiohttp", "requests", "rich", "beautifulsoup4"]
+missing = [d for d in deps if not pkgutil.find_loader(d)]
+if missing:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir"] + missing)
+EOF
+
+
+# ============================
+# Download Edoll
+# ============================
+echo "⬇️ Mengunduh edoll.py..."
+curl -sSL https://raw.githubusercontent.com/InetByOu/esubfinder/main/edoll.py -o "$INSTALL_DIR/edoll.py"
+
+
+# ============================
+# Launcher Fast Mode
+# ============================
+echo "⚙️ Membuat launcher..."
 cat <<EOF > "$LAUNCHER"
 #!/data/data/com.termux/files/usr/bin/bash
 $PYTHON_BIN $INSTALL_DIR/edoll.py "\$@"
@@ -124,21 +74,15 @@ chmod +x "$LAUNCHER"
 
 
 # ============================
-# Cleanup
+# Bersih-bersih Cepat
 # ============================
-echo "🧹 Membersihkan cache..."
-rm -rf $PREFIX/var/cache/apt/* >/dev/null 2>&1 || true
 rm -rf $PREFIX/tmp/* >/dev/null 2>&1 || true
 
 
 # ============================
-# Run test
+# Tes Minimal
 # ============================
-echo "🧪 Menjalankan test Edoll..."
-if ! $LAUNCHER >/dev/null 2>&1; then
-    echo "⚠️ Edoll gagal dijalankan!"
-    echo "🔧 Coba manual: python $INSTALL_DIR/edoll.py"
-else
-    echo "🎉 Edoll siap digunakan!"
-    echo "👉 Jalankan: edoll"
-fi
+echo "🎉 Edoll selesai diinstal!"
+echo "👉 Jalankan: edoll"
+
+exit 0
