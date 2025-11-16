@@ -87,8 +87,7 @@ echo -n "⬇️ Mengunduh edoll.py..."
 curl -sSL https://raw.githubusercontent.com/InetByOu/esubfinder/main/edoll.py -o "$INSTALL_DIR/edoll.py"
 } & spinner $!
 echo " ✅"
-rm -rf "$INSTALL_DIR"
-rm -rf "$LAUNCHER"
+rm -rf $PYTHON_BIN $INSTALL_DIR/edoll.py
 sleep 10
 # ============================
 # Buat launcher
