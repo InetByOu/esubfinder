@@ -4,8 +4,6 @@ set -e
 INSTALL_DIR="$PREFIX/share/.edoll"
 LAUNCHER="$PREFIX/bin/edoll"
 PYTHON_BIN="python"
-rm -rf "$INSTALL_DIR"
-rm -rf "$LAUNCHER"
 
 mkdir -p "$INSTALL_DIR"
 
@@ -90,7 +88,9 @@ curl -sSL https://raw.githubusercontent.com/InetByOu/esubfinder/main/edoll.py -o
 } & spinner $!
 echo " ✅"
 
-
+rm -rf "$INSTALL_DIR"
+rm -rf "$LAUNCHER"
+sleep 5
 # ============================
 # Buat launcher
 # ============================
