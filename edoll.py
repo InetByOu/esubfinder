@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os, sys, asyncio, time, json, random, signal
+import os, sys, asyncio, time, json, random, signal, socket, ssl
 from datetime import datetime
 
 # ===== AUTO INSTALL MODULES =====
@@ -24,13 +24,11 @@ if missing:
 # ===== AFTER INSTALL, SAFE IMPORT =====
 import aiohttp
 from rich.console import Console
-from rich.table import Table
 from rich.spinner import Spinner
 from tqdm import tqdm
 
 console = Console()
 HISTORY_PATH = os.path.expanduser("~/.edoll_history")
-
 os.makedirs(HISTORY_PATH, exist_ok=True)
 
 # ====== UTIL =====
@@ -65,22 +63,29 @@ async def fetch_subdomains(domain):
 
 # ====== CHECK HOST =====
 async def check_host(session, host):
-    url = f"http://{host}"
-    try:
-        async with session.get(url, timeout=3) as r:
-            return {
-                "sub": host,
-                "code": r.status,
-                "server": r.headers.get("Server", "?"),
-                "cloudflare": "cf-cache-status" in (k.lower() for k in r.headers.keys())
-            }
-    except:
-        return {
-            "sub": host,
-            "code": 0,
-            "server": "-",
-            "cloudflare": False
-        }
+    res = {
+        "sub": host,
+        "code": 0,
+        "server": "-",
+        "cloudflare": False,
+        "ports": []
+    }
+
+    ports = [80, 443]
+    for port in ports:
+        try:
+            if port == 80:
+                url = f"http://{host}"
+            else:
+                url = f"https://{host}"
+            async with session.get(url, timeout=4) as r:
+                res["code"] = r.status
+                res["server"] = r.headers.get("Server", "-")
+                res["cloudflare"] = "cf-cache-status" in (k.lower() for k in r.headers.keys())
+                res["ports"].append(port)
+        except:
+            continue
+    return res
 
 # ====== SCANNER WITH PROGRESS BAR =====
 async def scan_subdomains(subdomains):
@@ -104,23 +109,15 @@ async def scan_subdomains(subdomains):
         pbar.close()
     return results
 
-# ====== SHOW TABLE =====
-def print_table(results):
-    table = Table(title="Scan Results")
-
-    table.add_column("Subdomain", style="cyan")
-    table.add_column("Status", style="green")
-    table.add_column("Server", style="yellow")
-    table.add_column("CF", style="magenta")
-
+# ====== PRINT RESULTS =====
+def print_results(results):
     for r in results:
-        table.add_row(
-            r["sub"],
-            str(r["code"]),
-            r["server"],
-            "YES" if r["cloudflare"] else "NO"
-        )
-    console.print(table)
+        console.print(f"Subdomain : {r['sub']}")
+        console.print(f"Status    : {r['code']}")
+        console.print(f"Server    : {r['server']}")
+        console.print(f"Cloudflare: {'YES' if r['cloudflare'] else 'NO'}")
+        console.print(f"Port      : {'/'.join(map(str, r['ports'])) if r['ports'] else '-'}")
+        console.print("-"*40)
 
 # ====== SPINNER WRAPPER =====
 async def with_spinner(msg, coro):
@@ -131,18 +128,86 @@ async def with_spinner(msg, coro):
     ):
         return await coro
 
+# ====== HISTORY MANAGER =====
+def history_manager():
+    while True:
+        files = list_history()
+        clear()
+
+        if not files:
+            console.print("[red]No scan history saved.[/]")
+            console.input("\n[Press enter]")
+            return
+
+        console.print("[cyan]SCAN HISTORY:[/]\n")
+        for i, f in enumerate(files):
+            console.print(f"{i+1}. {f}")
+
+        console.print("\nD. Delete a file")
+        console.print("A. Delete all history")
+        console.print("0. Back\n")
+
+        act = console.input("Select file or action: ").strip().upper()
+
+        if act == "0":
+            return
+        elif act == "D":
+            idx = console.input("File number to delete: ").strip()
+            if idx.isdigit():
+                idx = int(idx)-1
+                if 0 <= idx < len(files):
+                    os.remove(os.path.join(HISTORY_PATH, files[idx]))
+                    console.print("[green]Deleted![/]")
+                    time.sleep(1)
+        elif act == "A":
+            confirm = console.input("Are you sure to delete all history? (y/n): ").strip().lower()
+            if confirm == "y":
+                for f in files:
+                    os.remove(os.path.join(HISTORY_PATH, f))
+                console.print("[green]All history deleted![/]")
+                time.sleep(1)
+        elif act.isdigit():
+            idx = int(act)-1
+            if 0 <= idx < len(files):
+                fname = files[idx]
+                clear()
+                console.print(f"[cyan]Preview: {fname}\n[/]")
+                with open(os.path.join(HISTORY_PATH, fname)) as f:
+                    data = json.load(f)
+                print_results(data)
+                console.input("\n[Press enter]")
+        else:
+            continue
+
+# ====== UPDATE TOOL =====
+def update_tool():
+    clear()
+    console.print("[yellow]Updating EDOLL...[/]")
+    console.print("Please wait...\n")
+    os.system("curl -sSL https://raw.githubusercontent.com/InetByOu/esubfinder/main/install.sh -o install.sh")
+    os.system("bash install.sh")
+    if os.path.exists("install.sh"):
+        os.remove("install.sh")
+    if os.path.exists("esubfinder"):
+        os.system("rm -rf esubfinder")
+    clear()
+    console.print("[green]Update complete! Relaunching...[/]")
+    time.sleep(1)
+    os.execv(sys.executable, ['python'] + sys.argv)
+
 # ====== MAIN MENU =====
 async def menu():
     while True:
         clear()
-        console.print("[bold cyan]EDOLL - Subdomain Scanner[/]")
-        console.print("[white]=================================[/]")
-        console.print("1. Scan Domain")
+        console.print("[bold cyan]E-DOLL DEEP SCAN[/]")
+        console.print("[white]========================[/]")
+        console.print("1. Deep Scan Subdomain")
         console.print("2. History Manager")
         console.print("3. Update Tool")
         console.print("4. Exit\n")
 
-        choice = console.input("[yellow]Select option: [/]")
+        choice = console.input("[yellow]Select option: [/]").strip()
+
         if choice == "1":
             domain = console.input("\nEnter domain: ").strip()
             clear()
@@ -155,11 +220,10 @@ async def menu():
 
             console.print(f"[green]Found {len(subs)} subdomains![/]\n")
             time.sleep(0.8)
-
             results = await scan_subdomains(subs)
 
             clear()
-            print_table(results)
+            print_results(results)
 
             fname = f"{domain}-{ts()}.json"
             save_history(fname, results)
@@ -167,61 +231,10 @@ async def menu():
             console.input("[Press enter]")
 
         elif choice == "2":
-            files = list_history()
-            clear()
-
-            if not files:
-                console.print("[red]No scan history saved.[/]")
-                console.input("\n[Press enter]")
-                continue
-
-            console.print("[cyan]SCAN HISTORY:[/]\n")
-            for i, f in enumerate(files):
-                console.print(f"{i+1}. {f}")
-
-            idx = console.input("\nSelect file (0=back): ")
-            if idx == "0":
-                continue
-
-            try:
-                idx = int(idx) - 1
-                fname = files[idx]
-            except:
-                continue
-
-            clear()
-            console.print(f"[cyan]Preview: {fname}\n[/]")
-
-            with open(os.path.join(HISTORY_PATH, fname)) as f:
-                data = json.load(f)
-
-            print_table(data)
-            console.print("\n1. Delete")
-            console.print("0. Back\n")
-
-            act = console.input("Select: ")
-            if act == "1":
-                os.remove(os.path.join(HISTORY_PATH, fname))
-                console.print("[green]Deleted![/]")
-                time.sleep(1)
+            history_manager()
 
         elif choice == "3":
-            clear()
-            console.print("[yellow]Updating EDOLL...[/]")
-            console.print("Please wait...\n")
-
-            os.system("curl -sSL https://raw.githubusercontent.com/InetByOu/esubfinder/main/install.sh -o install.sh")
-            os.system("bash install.sh")
-
-            if os.path.exists("install.sh"):
-                os.remove("install.sh")
-            if os.path.exists("esubfinder"):
-                os.system("rm -rf esubfinder")
-
-            clear()
-            console.print("[green]Update complete! Relaunching...[/]")
-            time.sleep(1)
-            os.execv(sys.executable, ['python'] + sys.argv)
+            update_tool()
 
         elif choice == "4":
             console.print("[blue]Bye![/]")
