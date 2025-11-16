@@ -87,13 +87,12 @@ echo -n "⬇️ Mengunduh edoll.py..."
 curl -sSL https://raw.githubusercontent.com/InetByOu/esubfinder/main/edoll.py -o "$INSTALL_DIR/edoll.py"
 } & spinner $!
 echo " ✅"
-
-sleep 5
+rm -rf "$INSTALL_DIR"
+rm -rf "$LAUNCHER"
+sleep 10
 # ============================
 # Buat launcher
 # ============================
-rm -rf "$INSTALL_DIR"
-rm -rf "$LAUNCHER"
 echo -n "⚙️ Membuat launcher..."
 {
 cat <<EOF > "$LAUNCHER"
