@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # edoll.py
 # EDOLL — Smart Subdomain Scanner & Inject Tester
-# Versi: E-V3.9 (Improved)
+# Versi: E-V3.10 (Improved + Persistent Config + CSV Export)
 # Author: Bang Edoll
 
 import os
@@ -10,9 +10,9 @@ import time
 import json
 import socket
 import ssl
-import threading
 import datetime
 import re
+import csv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Auto-install minimal required libs if missing
@@ -37,17 +37,37 @@ from rich import box
 console = Console()
 
 # -------------------------
-# Settings (editable in menu)
+# Config & Settings
 # -------------------------
-SETTINGS = {
-    "timeout": 5,
-    "max_subscan": 300,
-    "threads": 30,
-    "fetch_timeout": 10
-}
-
 HISTORY_DIR = "history"
+CONFIG_FILE = os.path.join(HISTORY_DIR, "config.json")
 os.makedirs(HISTORY_DIR, exist_ok=True)
+
+def load_config():
+    default = {
+        "timeout": 5,
+        "max_subscan": 300,
+        "threads": 30,
+        "fetch_timeout": 10,
+        "delay": 0.2   # delay antar request (detik) - sopan ke sumber
+    }
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                saved = json.load(f)
+            default.update(saved)
+        except:
+            pass
+    return default
+
+SETTINGS = load_config()
+
+def save_config():
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(SETTINGS, f, indent=2)
+    except Exception as e:
+        log_error(f"Gagal menyimpan config: {e}")
 
 SPIN_FRAMES = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
 
@@ -87,16 +107,13 @@ def clean_filename(s: str) -> str:
     return s
 
 def is_valid_subdomain(sub: str, domain: str) -> bool:
-    """Filter subdomain yang valid dan relevan"""
     if not sub or not isinstance(sub, str):
         return False
     sub = sub.lower().strip()
     if not sub.endswith(domain):
         return False
-    # Hindari wildcard dan karakter aneh
     if sub.startswith("*") or " " in sub or "<" in sub:
         return False
-    # Minimal harus ada titik sebelum domain
     if sub.count(".") < domain.count(".") + 1:
         return False
     return True
@@ -187,7 +204,7 @@ def tls_sni_test(host: str) -> dict:
         return {"ok": False, "cn": None, "sans": []}
 
 # -------------------------
-# Subdomain fetchers (parallel ready)
+# Subdomain fetchers
 # -------------------------
 def fetch_rapiddns(domain):
     try:
@@ -357,7 +374,7 @@ SUB_FETCHERS = [
 ]
 
 # -------------------------
-# Parallel Subdomain Collector (IMPROVED)
+# Parallel Subdomain Collector
 # -------------------------
 def collect_subdomains(domain: str):
     domain = domain.strip().lower()
@@ -380,6 +397,7 @@ def collect_subdomains(domain: str):
             anim_once(f"Processing {name}...", dur=0.3)
             for s in subs:
                 allsubs.add(clean_filename(s))
+            time.sleep(SETTINGS.get("delay", 0.1))  # sopan antar sumber
 
     subs_list = sorted(allsubs)
     log_info(f"Found {len(subs_list)} unique valid subdomains (capped to {SETTINGS['max_subscan']})")
@@ -442,6 +460,7 @@ def scan_host(host: str) -> dict:
         result["provider"] = provider_lookup(result["ip"]) if result["ip"] != "-" else {"org": None, "country": None}
     except Exception:
         result["provider"] = {"org": None, "country": None}
+    time.sleep(SETTINGS.get("delay", 0))  # delay antar host
     return result
 
 # -------------------------
@@ -465,6 +484,48 @@ def save_scan_history(domain: str, results: list):
     except Exception as e:
         log_error(f"Failed saving history: {e}")
         return None
+
+# -------------------------
+# Export to CSV
+# -------------------------
+def export_history_to_csv(json_path: str):
+    try:
+        with open(json_path, "r") as f:
+            data = json.load(f)
+        domain = data.get("domain", "unknown")
+        results = data.get("data", [])
+        if not results:
+            log_warn("Tidak ada data untuk diexport")
+            return
+
+        csv_name = clean_filename(domain) + "_" + timestamp_for_file() + ".csv"
+        csv_path = os.path.join(HISTORY_DIR, csv_name)
+
+        with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
+            fieldnames = ["host", "ip", "port80", "port443", "http_status", "https_status", "server", "cloudflare", "title", "provider_org", "provider_country"]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+
+            for r in results:
+                http = r.get("http", {}) or {}
+                https = r.get("https", {}) or {}
+                prov = r.get("provider", {}) or {}
+                writer.writerow({
+                    "host": r.get("host", ""),
+                    "ip": r.get("ip", ""),
+                    "port80": r.get("port80", ""),
+                    "port443": r.get("port443", ""),
+                    "http_status": http.get("status", ""),
+                    "https_status": https.get("status", ""),
+                    "server": http.get("server", "") or https.get("server", ""),
+                    "cloudflare": http.get("cloudflare", False) or https.get("cloudflare", False),
+                    "title": http.get("title", "") or https.get("title", ""),
+                    "provider_org": prov.get("org", ""),
+                    "provider_country": prov.get("country", "")
+                })
+        log_ok(f"Exported to CSV: {csv_path}")
+    except Exception as e:
+        log_error(f"Gagal export CSV: {e}")
 
 # -------------------------
 # Scan flow
@@ -559,7 +620,7 @@ def history_menu():
                 count = "-"
             table.add_row(str(i), f, count)
         console.print(table)
-        console.print("Options: v <no> = view, e = export ALL, m = merge, d <all|no|days> = delete, b = back")
+        console.print("Options: v <no> = view JSON, c <no> = export CSV, e = export ALL JSON, m = merge, d <all|no|days> = delete, b = back")
         cmd = safe_input("> ").strip().lower()
         if not cmd:
             continue
@@ -575,6 +636,17 @@ def history_menu():
                     log_warn("Index out of range")
             else:
                 log_warn("Usage: v <number>")
+            safe_input("Enter to continue...")
+        elif cmd.startswith("c"):
+            parts = cmd.split()
+            if len(parts) >= 2 and parts[1].isdigit():
+                idx = int(parts[1]) - 1
+                if 0 <= idx < len(files):
+                    export_history_to_csv(os.path.join(HISTORY_DIR, files[idx]))
+                else:
+                    log_warn("Index out of range")
+            else:
+                log_warn("Usage: c <number>")
             safe_input("Enter to continue...")
         elif cmd == "e":
             export_all_history(); safe_input("Enter to continue...")
@@ -672,39 +744,56 @@ def inject_tester_menu():
             log_warn("  TLS handshake failed or blocked")
 
 # -------------------------
-# Settings menu
+# Settings menu (dengan persistent config)
 # -------------------------
 def settings_menu():
     while True:
         clear_screen()
-        console.print("[bold cyan]Settings[/bold cyan]")
-        console.print(f"1. Timeout (seconds): {SETTINGS['timeout']}")
-        console.print(f"2. Max subdomains returned: {SETTINGS['max_subscan']}")
-        console.print(f"3. Threads: {SETTINGS['threads']}")
-        console.print("4. Back")
+        console.print("[bold cyan]Settings (otomatis tersimpan)[/bold cyan]")
+        console.print(f"1. Timeout (detik)          : {SETTINGS['timeout']}")
+        console.print(f"2. Max subdomain            : {SETTINGS['max_subscan']}")
+        console.print(f"3. Threads                  : {SETTINGS['threads']}")
+        console.print(f"4. Delay antar request (s)  : {SETTINGS.get('delay', 0.2)}")
+        console.print("5. Back & Save")
         ch = safe_input("> ").strip()
         if ch == "1":
-            val = safe_input("New timeout (seconds): ").strip()
+            val = safe_input("New timeout (detik): ").strip()
             try:
-                SETTINGS['timeout'] = int(val); log_ok("Timeout updated")
+                SETTINGS['timeout'] = int(val)
+                save_config()
+                log_ok("Timeout updated & saved")
             except:
-                log_warn("Invalid")
+                log_warn("Invalid number")
         elif ch == "2":
-            val = safe_input("Max subdomains (int): ").strip()
+            val = safe_input("Max subdomains: ").strip()
             try:
-                SETTINGS['max_subscan'] = int(val); log_ok("Max subscan updated")
+                SETTINGS['max_subscan'] = int(val)
+                save_config()
+                log_ok("Max subscan updated & saved")
             except:
-                log_warn("Invalid")
+                log_warn("Invalid number")
         elif ch == "3":
-            val = safe_input("Threads (int): ").strip()
+            val = safe_input("Threads: ").strip()
             try:
-                SETTINGS['threads'] = int(val); log_ok("Threads updated")
+                SETTINGS['threads'] = int(val)
+                save_config()
+                log_ok("Threads updated & saved")
             except:
-                log_warn("Invalid")
+                log_warn("Invalid number")
         elif ch == "4":
+            val = safe_input("Delay antar request (detik, 0 = tanpa delay): ").strip()
+            try:
+                SETTINGS['delay'] = float(val)
+                save_config()
+                log_ok("Delay updated & saved")
+            except:
+                log_warn("Invalid number")
+        elif ch == "5":
+            save_config()
+            log_ok("Settings disimpan")
             return
         else:
-            log_warn("Unknown choice")
+            log_warn("Pilihan tidak valid")
 
 # -------------------------
 # Main menu
@@ -712,11 +801,11 @@ def settings_menu():
 def main_menu():
     while True:
         clear_screen()
-        console.print("[bold cyan]EDOLL — Smart Subdomain Scanner & Inject Tester[/bold cyan]")
-        console.print("1) Scan domain (multi-source parallel + full analysis)")
-        console.print("2) Inject tester (choose from history / manual)")
-        console.print("3) History Manager (view/export/merge/delete)")
-        console.print("4) Settings")
+        console.print("[bold cyan]EDOLL — Smart Subdomain Scanner v3.10[/bold cyan]")
+        console.print("1) Scan domain (parallel + full analysis)")
+        console.print("2) Inject tester (dari history / manual)")
+        console.print("3) History Manager (view / CSV export / merge / delete)")
+        console.print("4) Settings (persistent)")
         console.print("0) Exit")
         ch = safe_input("> ").strip()
         if ch == "1":
