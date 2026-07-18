@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # edoll.py
-# EDOLL — Full Inject-ready Scanner (Fixed)
-# Copy & run: edoll
+# EDOLL — Smart Subdomain Scanner & Inject Tester
+# Versi: E-V3.9 (Improved)
+# Author: Bang Edoll
 
 import os
 import sys
@@ -41,7 +42,8 @@ console = Console()
 SETTINGS = {
     "timeout": 5,
     "max_subscan": 300,
-    "threads": 30
+    "threads": 30,
+    "fetch_timeout": 10
 }
 
 HISTORY_DIR = "history"
@@ -50,7 +52,7 @@ os.makedirs(HISTORY_DIR, exist_ok=True)
 SPIN_FRAMES = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
 
 # -------------------------
-# Logging helpers (safe names)
+# Logging helpers
 # -------------------------
 def log_ok(msg):
     console.print(f"[green]✔[/green] {msg}")
@@ -64,9 +66,6 @@ def log_warn(msg):
 def log_error(msg):
     console.print(f"[red]✘[/red] {msg}")
 
-# -------------------------
-# Small utilities
-# -------------------------
 def safe_input(prompt="> "):
     try:
         return input(prompt)
@@ -86,6 +85,21 @@ def clean_filename(s: str) -> str:
     s = re.sub(r'[<>:"/\\|?*]', "_", s)
     s = s.replace(" ", "_")
     return s
+
+def is_valid_subdomain(sub: str, domain: str) -> bool:
+    """Filter subdomain yang valid dan relevan"""
+    if not sub or not isinstance(sub, str):
+        return False
+    sub = sub.lower().strip()
+    if not sub.endswith(domain):
+        return False
+    # Hindari wildcard dan karakter aneh
+    if sub.startswith("*") or " " in sub or "<" in sub:
+        return False
+    # Minimal harus ada titik sebelum domain
+    if sub.count(".") < domain.count(".") + 1:
+        return False
+    return True
 
 def anim_once(text, dur=0.6):
     start = time.time()
@@ -173,12 +187,12 @@ def tls_sni_test(host: str) -> dict:
         return {"ok": False, "cn": None, "sans": []}
 
 # -------------------------
-# Subdomain fetchers
+# Subdomain fetchers (parallel ready)
 # -------------------------
 def fetch_rapiddns(domain):
     try:
         url = f"https://rapiddns.io/subdomain/{domain}?full=1"
-        r = requests.get(url, timeout=10)
+        r = requests.get(url, timeout=SETTINGS["fetch_timeout"])
         soup = BeautifulSoup(r.text, "html.parser")
         subs = []
         table = soup.find("table")
@@ -196,15 +210,15 @@ def fetch_rapiddns(domain):
 def fetch_crtsh(domain):
     try:
         url = f"https://crt.sh/?q=%25.{domain}&output=json"
-        r = requests.get(url, timeout=12)
+        r = requests.get(url, timeout=SETTINGS["fetch_timeout"])
         j = r.json()
         subs = set()
         for it in j:
             nv = it.get("name_value") or ""
             for line in nv.splitlines():
-                line = line.strip()
+                line = line.strip().lower()
                 if line and domain in line:
-                    subs.add(line.lower())
+                    subs.add(line)
         return list(subs)
     except Exception:
         return []
@@ -212,12 +226,12 @@ def fetch_crtsh(domain):
 def fetch_riddler(domain):
     try:
         url = f"https://riddler.io/search/exportcsv?q=pld:{domain}"
-        r = requests.get(url, timeout=10)
+        r = requests.get(url, timeout=SETTINGS["fetch_timeout"])
         subs = set()
         for ln in r.text.splitlines():
             parts = ln.split(",")
             if len(parts) >= 1:
-                candidate = parts[0].strip().strip('"')
+                candidate = parts[0].strip().strip('"').lower()
                 if domain in candidate:
                     subs.add(candidate)
         return list(subs)
@@ -227,10 +241,10 @@ def fetch_riddler(domain):
 def fetch_sonar(domain):
     try:
         url = f"https://sonar.omnisint.io/subdomains/{domain}"
-        r = requests.get(url, timeout=8)
+        r = requests.get(url, timeout=SETTINGS["fetch_timeout"])
         if r.status_code == 200:
             j = r.json()
-            return [x for x in j if domain in x]
+            return [x.lower() for x in j if isinstance(x, str) and domain in x]
         return []
     except Exception:
         return []
@@ -238,14 +252,14 @@ def fetch_sonar(domain):
 def fetch_bufferover(domain):
     try:
         url = f"https://dns.bufferover.run/dns?q=.{domain}"
-        r = requests.get(url, timeout=10).json()
+        r = requests.get(url, timeout=SETTINGS["fetch_timeout"]).json()
         subs = set()
         for k in ("FDNS_A", "RDNS"):
             for e in r.get(k, []):
                 if isinstance(e, str) and domain in e:
                     parts = e.split(",")
                     if len(parts) > 1:
-                        subs.add(parts[1].strip())
+                        subs.add(parts[1].strip().lower())
         return list(subs)
     except Exception:
         return []
@@ -253,11 +267,11 @@ def fetch_bufferover(domain):
 def fetch_hackertarget(domain):
     try:
         url = f"https://api.hackertarget.com/hostsearch/?q={domain}"
-        r = requests.get(url, timeout=8)
+        r = requests.get(url, timeout=SETTINGS["fetch_timeout"])
         subs = []
         for ln in r.text.splitlines():
             if domain in ln:
-                subs.append(ln.split(",")[0].strip())
+                subs.append(ln.split(",")[0].strip().lower())
         return subs
     except Exception:
         return []
@@ -265,17 +279,17 @@ def fetch_hackertarget(domain):
 def fetch_threatcrowd(domain):
     try:
         url = f"https://www.threatcrowd.org/searchApi/v2/domain/report/?domain={domain}"
-        r = requests.get(url, timeout=8).json()
-        return r.get("subdomains", []) or []
+        r = requests.get(url, timeout=SETTINGS["fetch_timeout"]).json()
+        return [s.lower() for s in (r.get("subdomains", []) or [])]
     except Exception:
         return []
 
 def fetch_anubis(domain):
     try:
         url = f"https://jldc.me/anubis/subdomains/{domain}"
-        r = requests.get(url, timeout=8)
+        r = requests.get(url, timeout=SETTINGS["fetch_timeout"])
         if r.status_code == 200:
-            return r.json()
+            return [s.lower() for s in r.json()]
         return []
     except Exception:
         return []
@@ -283,13 +297,15 @@ def fetch_anubis(domain):
 def fetch_webarchive(domain):
     try:
         url = f"http://web.archive.org/cdx/search/cdx?url=*.{domain}/*&output=json&collapse=urlkey"
-        r = requests.get(url, timeout=10).json()
+        r = requests.get(url, timeout=SETTINGS["fetch_timeout"]).json()
         subs = set()
-        for row in r[1:]:
-            host = row[2]
-            host = host.replace("http://", "").replace("https://", "").split("/")[0]
-            if domain in host:
-                subs.add(host)
+        for row in r[1:] if isinstance(r, list) else []:
+            try:
+                host = row[2].replace("http://", "").replace("https://", "").split("/")[0].lower()
+                if domain in host:
+                    subs.add(host)
+            except:
+                pass
         return list(subs)
     except Exception:
         return []
@@ -297,21 +313,21 @@ def fetch_webarchive(domain):
 def fetch_threatminer(domain):
     try:
         url = f"https://api.threatminer.org/v2/domain.php?q={domain}&rt=5"
-        r = requests.get(url, timeout=8).json()
-        return r.get("results", []) or []
+        r = requests.get(url, timeout=SETTINGS["fetch_timeout"]).json()
+        return [s.lower() for s in (r.get("results", []) or [])]
     except Exception:
         return []
 
 def fetch_dnsdumpster(domain):
     try:
         url = f"https://dnsdumpster.com/static/map/{domain}.json"
-        r = requests.get(url, timeout=8)
+        r = requests.get(url, timeout=SETTINGS["fetch_timeout"])
         j = r.json()
         hosts = []
         for h in j.get("dns_records", {}).get("host", []):
             domainname = h.get("domain")
             if domainname:
-                hosts.append(domainname)
+                hosts.append(domainname.lower())
         return hosts
     except Exception:
         return []
@@ -319,7 +335,7 @@ def fetch_dnsdumpster(domain):
 def fetch_google_ct(domain):
     try:
         url = f"https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/v1/domain/{domain}"
-        r = requests.get(url, timeout=10)
+        r = requests.get(url, timeout=SETTINGS["fetch_timeout"])
         txt = r.text
         if txt.startswith(")]}'"):
             txt = txt[4:]
@@ -327,8 +343,8 @@ def fetch_google_ct(domain):
         subs = set()
         for cert in j.get("report", {}).get("certificates", []):
             for dn in cert.get("dnsNames", []):
-                if domain in dn:
-                    subs.add(dn)
+                if domain in dn.lower():
+                    subs.add(dn.lower())
         return list(subs)
     except Exception:
         return []
@@ -341,24 +357,32 @@ SUB_FETCHERS = [
 ]
 
 # -------------------------
-# Aggregator
+# Parallel Subdomain Collector (IMPROVED)
 # -------------------------
 def collect_subdomains(domain: str):
     domain = domain.strip().lower()
-    log_info(f"Collecting subdomains for {domain} from {len(SUB_FETCHERS)} sources...")
+    log_info(f"Collecting subdomains for {domain} from {len(SUB_FETCHERS)} sources (parallel)...")
     allsubs = set()
-    for src in SUB_FETCHERS:
-        name = src.__name__.replace("fetch_", "").upper()
-        anim_once(f"Query {name}...", dur=0.6)
+
+    def _fetch_wrapper(fetcher):
+        name = fetcher.__name__.replace("fetch_", "").upper()
         try:
-            subs = src(domain) or []
-            for s in subs:
-                if isinstance(s, str) and domain in s:
-                    allsubs.add(clean_filename(s.lower()))
+            subs = fetcher(domain) or []
+            valid = [s for s in subs if is_valid_subdomain(s, domain)]
+            return name, valid
         except Exception:
-            pass
+            return name, []
+
+    with ThreadPoolExecutor(max_workers=min(8, len(SUB_FETCHERS))) as ex:
+        futures = {ex.submit(_fetch_wrapper, f): f for f in SUB_FETCHERS}
+        for fut in as_completed(futures):
+            name, subs = fut.result()
+            anim_once(f"Processing {name}...", dur=0.3)
+            for s in subs:
+                allsubs.add(clean_filename(s))
+
     subs_list = sorted(allsubs)
-    log_info(f"Found {len(subs_list)} unique subdomains (capped to {SETTINGS['max_subscan']})")
+    log_info(f"Found {len(subs_list)} unique valid subdomains (capped to {SETTINGS['max_subscan']})")
     return subs_list[:SETTINGS["max_subscan"]]
 
 # -------------------------
@@ -377,7 +401,7 @@ def display_vertical(results: list):
         http = r.get('http') or {}
         https = r.get('https') or {}
         console.print(f"  HTTP      : {http.get('status') or '-'}  | server: {http.get('server') or '-'} | CF: {http.get('cloudflare')}")
-        console.print(f"  HTTPS     : {https.get('status') or '-'}  | server: {https.get('server') or '-'} | CF: {https.get('cloudflare')}")
+        console.print(f"  HTTPS     : {https.get('status') or '-'}  | server: {https.get('server') or '-'} | CF: {http.get('cloudflare')}")
         tls = r.get('tls') or {}
         if tls.get('ok'):
             cn = tls.get('cn') or "-"
@@ -397,13 +421,11 @@ def scan_host(host: str) -> dict:
         result["ip"] = ip
     except Exception:
         result["ip"] = "-"
-    # ports
     try:
         result["port80"] = "OPEN" if check_port(host, 80) else "CLOSED"
         result["port443"] = "OPEN" if check_port(host, 443) else "CLOSED"
     except Exception:
         pass
-    # http/https checks
     try:
         result["http"] = http_check(host, use_ssl=False)
     except Exception:
@@ -412,12 +434,10 @@ def scan_host(host: str) -> dict:
         result["https"] = http_check(host, use_ssl=True)
     except Exception:
         result["https"] = {}
-    # tls sni
     try:
         result["tls"] = tls_sni_test(host)
     except Exception:
         result["tls"] = {"ok": False, "cn": None, "sans": []}
-    # provider/asn
     try:
         result["provider"] = provider_lookup(result["ip"]) if result["ip"] != "-" else {"org": None, "country": None}
     except Exception:
@@ -451,6 +471,9 @@ def save_scan_history(domain: str, results: list):
 # -------------------------
 def perform_scan(domain: str):
     domain = domain.strip().lower()
+    if not re.match(r"^[a-z0-9.-]+\.[a-z]{2,}$", domain):
+        log_warn("Domain tidak valid. Contoh: example.com")
+        return
     anim_once(f"Collecting subdomains for {domain}...", dur=0.8)
     subs = collect_subdomains(domain)
     if not subs:
@@ -637,7 +660,6 @@ def inject_tester_menu():
         ok443 = check_port(host, 443)
         console.print(f"  Port 80: {ok80}")
         console.print(f"  Port 443: {ok443}")
-        # try real connect 443
         try:
             s = socket.socket()
             s.settimeout(SETTINGS["timeout"])
@@ -690,8 +712,8 @@ def settings_menu():
 def main_menu():
     while True:
         clear_screen()
-        console.print("[bold cyan]EDOLL — Full Inject-ready Scanner (fixed)[/bold cyan]")
-        console.print("1) Scan domain (multi-source + full analysis)")
+        console.print("[bold cyan]EDOLL — Smart Subdomain Scanner & Inject Tester[/bold cyan]")
+        console.print("1) Scan domain (multi-source parallel + full analysis)")
         console.print("2) Inject tester (choose from history / manual)")
         console.print("3) History Manager (view/export/merge/delete)")
         console.print("4) Settings")
